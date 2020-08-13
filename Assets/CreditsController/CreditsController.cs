@@ -1,12 +1,14 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using TMPro;
+using UnityEditor;
 
 /// <summary>
 /// Created on: 01/08/20 by - Tyler J. Sims
-/// Simple handler for a modular credits system!
+/// "Simple" handler for a modular credits system!
 /// 
 /// Features:
 ///  * Placeholder
@@ -17,7 +19,11 @@ public class CreditsController : MonoBehaviour
     public RectTransform header;              // HOLDS ALL THE OBJECTS THAT GET SORTED FOR THE CREDITS
     [Header("Standard Settings")]
     [SerializeField] float scrollSpeed = 85f; // HOW FAST IT SCROLLS ACROSS THE SCREEN
+
+    [SerializeField] private bool doesLoop = true;
+    [SerializeField] private float loopPoint;
     [SerializeField] private float startingPoint;
+    
     [Range(0.025f,2f)]
     [SerializeField] float sectionGap = 1.0f;
     [Range(0.025f,2f)]
@@ -36,30 +42,56 @@ public class CreditsController : MonoBehaviour
     public TMP_FontAsset sectionFont;
     public TMP_FontAsset contentFont;
 
-    
-    [Header("Other Settings")]
+
+    [Header("Other Settings")] 
+    [SerializeField] private bool useDisplayFlags;
     [SerializeField] string returnToScene;
+
+    [Header("Playmode Status")] 
+    [SerializeField] private RectTransform endPoint;
 
     [HideInInspector]
     public string textBox;
 
+    private Transform _startPointDisplay;
+    private Transform _loopPointDisplay;
+    
     private void Start()
     {
-        SortCredits();
+        ResetHead();
     }
 
     void Update()
     {
         var pos = header.anchoredPosition; // Get header position
         pos.y += scrollSpeed * Time.deltaTime;    // Increase vertical height
+        
+        if (endPoint.position.y - (header.sizeDelta.y*1.5f) > loopPoint) // bruh, this jank af FIX ASAP
+            if(doesLoop)
+                pos.y = startingPoint;
+            else Destroy(header.gameObject);
+        
         header.anchoredPosition = pos;            // Apply movement
+        
+        
     }
 
+    public void ResetHead()
+    {
+        SortCredits();
+        header.anchoredPosition = new Vector2(header.anchoredPosition.x,startingPoint);
+        useDisplayFlags = false;
+        if(_startPointDisplay)
+            Destroy(_startPointDisplay.gameObject);
+        if(_loopPointDisplay)
+            Destroy(_loopPointDisplay.gameObject);
+    }
+    
     // ORGANIZES ALL THE CREDITS IN A MODULAR FASHION
     public void SortCredits()
     {
-        float p = startingPoint; // Initial starting y position;
-        
+        float p = 0; // Initial starting y position;
+        RectTransform end = null;
         // find each child of header (layer 0) -- THIS is layer 1, section
         for (int i = 0; i < header.transform.childCount; i++)
         {
@@ -71,7 +103,7 @@ public class CreditsController : MonoBehaviour
             // section font size
             SetFontTypeSize(section, sectionFontSize, sectionFont);
             
-
+            end = section;
             // find each child of section (layer 1) -- THIS is layer 2, content
             for (int j = 0; j < header.transform.GetChild(i).childCount; j++)
             {
@@ -87,9 +119,13 @@ public class CreditsController : MonoBehaviour
                 SetHeight(content,contentHeight);
                 // content font size
                 SetFontTypeSize(content, contentFontSize, contentFont);
+                end = content;
             }
+            
             p -= section.sizeDelta.y * sectionGap;
         }
+
+        endPoint = end;
     }
 
     void SetHeight(RectTransform t, float height)
@@ -114,24 +150,39 @@ public class CreditsController : MonoBehaviour
     public void AddSection(string incString)
     {
         GameObject newSection = new GameObject();
-        newSection.AddComponent<CC_SectionUtil>();
-        newSection.AddComponent<TextMeshPro>().text = incString;
+        newSection.AddComponent<RectTransform>();
+        
+        newSection.gameObject.AddComponent<CC_SectionUtil>();
+        newSection.gameObject.AddComponent<TextMeshProUGUI>().text = incString;
         newSection.transform.parent = this.transform;
+        newSection.transform.localScale = Vector3.one;
+
+        var t = newSection.GetComponent<RectTransform>();
+        var text = newSection.GetComponent<TextMeshProUGUI>();
+        
+        t.anchorMin = new Vector2(0,0.5f);
+        t.anchorMax = new Vector2(1.0f,0.5f);
+        t.anchoredPosition = Vector2.zero;
+        t.offsetMin = new Vector2(0,100);
+        t.offsetMax = new Vector2(0,0);
+        
         newSection.name = "Section_" + incString;
 
+        text.fontStyle = FontStyles.Underline;
         if (sectionFont != null)
-            newSection.GetComponent<TextMeshPro>().font = sectionFont;
+            text.font = sectionFont;
+        SortCredits();
     }
     public void ReloadItems()
     {
         for (int i = 0; i < transform.childCount; i++) // Section (I.E. Art, Design, etc...)
         {
-            transform.GetChild(i).GetComponent<TextMeshPro>().font = sectionFont;
-            transform.GetChild(i).GetComponent<TextMeshPro>().fontSize = sectionFontSize;
+            transform.GetChild(i).GetComponent<TextMeshProUGUI>().font = sectionFont;
+            transform.GetChild(i).GetComponent<TextMeshProUGUI>().fontSize = sectionFontSize;
 
             for (int j = 0; j < transform.GetChild(i).childCount; j++) // Section Items (I.E. Tyler, SomeArt by PersonMan, etc...)
             {
-                transform.GetChild(i).GetChild(j).GetComponent<TextMeshPro>().fontSize = contentFontSize;
+                transform.GetChild(i).GetChild(j).GetComponent<TextMeshProUGUI>().fontSize = contentFontSize;
 
             }
         }
@@ -140,8 +191,27 @@ public class CreditsController : MonoBehaviour
     #if UNITY_EDITOR
     private void OnValidate()
     {
+        if (useDisplayFlags)
+        {
+            if(!_startPointDisplay)
+                _startPointDisplay = GameObject.FindWithTag("CC_StartPointFlag").transform;
+            if(!_loopPointDisplay)
+                _loopPointDisplay = GameObject.FindWithTag("CC_LoopPointFlag").transform;
+            SortDisplayGizmos();
+        }
         SortCredits();
     }
+
+    void SortDisplayGizmos()
+    {
+        var loopTransform = _loopPointDisplay.GetComponent<RectTransform>();
+        var startTransform = _startPointDisplay.GetComponent<RectTransform>();
+
+        var pos = header.anchoredPosition;
+        loopTransform.anchoredPosition = new Vector2(pos.x, loopPoint);
+        startTransform.anchoredPosition = new Vector2(pos.x, startingPoint);
+    }
+    
 #endif
     
     #endregion

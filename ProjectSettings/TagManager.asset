@@ -3,7 +3,10 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - CC_StartPointFlag
+  - CC_LoopPointFlag
+  - CC_EndPointFlag
   layers:
   - Default
   - TransparentFX

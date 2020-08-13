@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data.Common;
 using UnityEngine;
 using UnityEngine.Events;
 using TMPro;
 using UnityEngine.EventSystems;
-using UnityEngine.UIElements;
+using UnityEngine.UI;
 using Button = UnityEngine.UI.Button;
 
 /// <summary>
@@ -45,12 +46,14 @@ public class CC_LinkButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
      
     // general references
     private TextMeshProUGUI _text;
+    private Image _image;
     private AudioSource _audio;
 
     private void Start()
     {
         _audio = FindObjectOfType<AudioSource>();
         _text = GetComponent<TextMeshProUGUI>();
+        _image = GetComponent<Image>();
     }
 
     private void Update()
@@ -59,13 +62,15 @@ public class CC_LinkButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
             Click();
 
         if (_text)
-            SetTextColor();
+            _text.color = GetColor(_text.color);
+        if (_image)
+            _image.color = GetColor(_image.color);
     }
 
-    void SetTextColor()
+    Color GetColor(Color input)
     {
         var t = tintTime * Time.deltaTime;
-        _text.color = _ready ? Color.Lerp(_text.color, cHighlighted, t) : _text.color = Color.Lerp(_text.color, cNormal, t); 
+        return _ready ? Color.Lerp(input, cHighlighted, t) : Color.Lerp(input, cNormal, t);
     }
     
     void Click()
